@@ -1,0 +1,31 @@
+#!/bin/bash
+# Send a prompt to Gemini and print ONLY the response.
+#
+# Usage:
+#   ai-ask "your prompt"
+#   ai-ask --file image.png "describe this image"
+#   ai-ask --login "prompt"
+#
+# For step-by-step debug output, use: ai-ask-debug
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [ $# -eq 0 ]; then
+    echo "Usage: ai-ask [OPTIONS] \"your prompt\""
+    echo ""
+    echo "Options:"
+    echo "  --file F         Attach image file to prompt"
+    echo "  --login          Force re-login (opens browser)"
+    echo "  --no-headless    Show the browser window"
+    echo ""
+    echo "Examples:"
+    echo "  ai-ask \"What is Python?\""
+    echo "  ai-ask \"translate to english: chào buổi sáng\""
+    echo "  ai-ask --file photo.png \"describe this image\""
+    echo "  ai-ask --login \"Hello\""
+    echo ""
+    echo "Debug mode: ai-ask-debug (shows step-by-step output)"
+    exit 1
+fi
+
+cd "$SCRIPT_DIR" && poetry run python -m tools.ask --quiet "$@"

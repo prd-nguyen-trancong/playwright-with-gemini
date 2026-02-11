@@ -1,0 +1,29 @@
+#!/bin/bash
+# Send a prompt to Gemini with full step-by-step debug output.
+#
+# Usage:
+#   ai-ask-debug "your prompt"
+#   ai-ask-debug --file image.png "describe this image"
+#   ai-ask-debug --login "prompt"
+#   ai-ask-debug --no-headless "prompt"
+#   ai-ask-debug --screenshot result.png "prompt"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [ $# -eq 0 ]; then
+    echo "Usage: ai-ask-debug [OPTIONS] \"your prompt\""
+    echo ""
+    echo "Options:"
+    echo "  --file F         Attach image file to prompt"
+    echo "  --login          Force re-login (opens browser)"
+    echo "  --no-headless    Show the browser window"
+    echo "  --screenshot F   Save page screenshot to file"
+    echo ""
+    echo "Examples:"
+    echo "  ai-ask-debug \"What is Python?\""
+    echo "  ai-ask-debug --file photo.png \"describe this image\""
+    echo "  ai-ask-debug --no-headless \"Hello Gemini\""
+    exit 1
+fi
+
+cd "$SCRIPT_DIR" && poetry run python -m tools.ask "$@"

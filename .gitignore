@@ -1,0 +1,38 @@
+# Environment variables
+.env
+
+# Browser session data (persistent login)
+.browser-data/
+
+# Debug screenshots
+debug_*.png
+
+# Gemini generated output
+gemini_*.png
+gemini_*.mp4
+
+# Output directory (generated images & videos)
+output/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

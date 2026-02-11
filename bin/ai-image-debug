@@ -1,0 +1,29 @@
+#!/bin/bash
+# Generate an image using Gemini's "Create images" tool with debug output.
+#
+# Usage:
+#   ai-image-debug "image of a banana"
+#   ai-image-debug --output output/banana.png "a cute banana cartoon"
+#   ai-image-debug --login "image of a cat"
+#   ai-image-debug --no-headless "image of a sunset"
+#   ai-image-debug --screenshot result.png "image of a dog"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [ $# -eq 0 ]; then
+    echo "Usage: ai-image-debug [OPTIONS] \"prompt\""
+    echo ""
+    echo "Options:"
+    echo "  --output F       Save image to file F (default: output/image_<id>.png)"
+    echo "  --login          Force re-login (opens browser)"
+    echo "  --no-headless    Show the browser window"
+    echo "  --screenshot F   Save page screenshot to file"
+    echo ""
+    echo "Examples:"
+    echo "  ai-image-debug \"image of a banana\""
+    echo "  ai-image-debug --output output/banana.png \"a cute banana cartoon\""
+    echo "  ai-image-debug --no-headless \"image of a sunset\""
+    exit 1
+fi
+
+cd "$SCRIPT_DIR" && poetry run python -m tools.image "$@"
