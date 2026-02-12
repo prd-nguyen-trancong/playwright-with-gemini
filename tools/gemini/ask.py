@@ -2,17 +2,17 @@
 Gemini Ask - Send text prompts and get text responses.
 
 Usage:
-    poetry run python -m tools.ask "What is Python?"
-    poetry run python -m tools.ask --file image.png "describe this image"
-    poetry run python -m tools.ask --quiet "2+2"
-    poetry run python -m tools.ask --login "Hello"
+    poetry run python -m tools.gemini.ask "What is Python?"
+    poetry run python -m tools.gemini.ask --file image.png "describe this image"
+    poetry run python -m tools.gemini.ask --quiet "2+2"
+    poetry run python -m tools.gemini.ask --login "Hello"
 """
 
 import argparse
 import sys
 import time
 
-from tools.base import GeminiBase
+from tools.gemini.base import GeminiBase
 
 
 class GeminiAsk(GeminiBase):
@@ -72,7 +72,7 @@ class GeminiAsk(GeminiBase):
                 pass
 
             self.log(".", end="")
-            time.sleep(2)
+            time.sleep(1)
 
         if last_text:
             self.log(" done (timeout, returning partial)!")
@@ -88,10 +88,10 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  poetry run python -m tools.ask "What is Python?"
-  poetry run python -m tools.ask --file photo.jpg "describe this image"
-  poetry run python -m tools.ask --quiet "Hello"
-  poetry run python -m tools.ask --login "Hello"
+  poetry run python -m tools.gemini.ask "What is Python?"
+  poetry run python -m tools.gemini.ask --file photo.jpg "describe this image"
+  poetry run python -m tools.gemini.ask --quiet "Hello"
+  poetry run python -m tools.gemini.ask --login "Hello"
 """,
     )
     parser.add_argument("prompt", help="The prompt to send to Gemini")
@@ -102,6 +102,17 @@ Examples:
     parser.add_argument("--quiet", action="store_true", default=False, help="Only print the response")
 
     args = parser.parse_args()
+
+    # Stop browser daemon and kill any orphaned Chrome processes
+    # that might be locking the profile
+    try:
+        from tools.gemini.browser import BrowserDaemon
+        BrowserDaemon.stop()
+    except Exception:
+        pass
+    # Extra safety: wait briefly for processes to fully exit
+    import time as _time
+    _time.sleep(1)
 
     tool = GeminiAsk(quiet=args.quiet)
     response = tool.run(

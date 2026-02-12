@@ -1,0 +1,41 @@
+#!/bin/bash
+# Scrape story chapters and summarize using a Gemini Gem.
+#
+# Workflow:
+#   1. Scrape chapter from truyenfull.vision
+#   2. Send to Gem for summarization (via GeminiFastGem service)
+#   3. Save summary to output_summary_story/<slug>.txt
+#
+# Usage:
+#   # Single chapter
+#   story-get-summary "https://truyenfull.vision/.../chuong-1201/"
+#
+#   # Batch: chapters 1201 to 1211
+#   story-get-summary --from 1201 --to 1211 \
+#     "https://truyenfull.vision/pham-nhan-tu-tien-chi-tien-gioi-thien-pham-nhan-tu-tien-2/"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [ $# -eq 0 ]; then
+    echo "Usage: story-get-summary [OPTIONS] \"url\""
+    echo ""
+    echo "Options:"
+    echo "  --gem ID         Gem ID for summarization (default: dcca1e614968)"
+    echo "  --from N         Starting chapter number (batch mode)"
+    echo "  --to N           Ending chapter number (batch mode)"
+    echo "  --quiet          Only print the summaries"
+    echo ""
+    echo "Examples:"
+    echo "  # Single chapter"
+    echo "  story-get-summary \"https://truyenfull.vision/.../chuong-1201/\""
+    echo ""
+    echo "  # Batch: chapters 1201 to 1211"
+    echo "  story-get-summary --from 1201 --to 1211 \\"
+    echo "    \"https://truyenfull.vision/pham-nhan-tu-tien-chi-tien-gioi-thien-pham-nhan-tu-tien-2/\""
+    echo ""
+    echo "Output:"
+    echo "  output_summary_story/<slug>.txt  # Summary from Gem"
+    exit 1
+fi
+
+cd "$SCRIPT_DIR" && poetry run python -m tools.story.summary "$@"

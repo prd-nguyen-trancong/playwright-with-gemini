@@ -26,4 +26,4 @@ if [ $# -eq 0 ]; then
     exit 1
 fi
 
-cd "$SCRIPT_DIR" && poetry run python -m tools.veo "$@"
+cd "$SCRIPT_DIR" && poetry run python -m tools.gemini.veo "$@"

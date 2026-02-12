@@ -1,0 +1,9 @@
+#!/bin/bash
+# Stop the Gemini browser daemon to free up memory.
+#
+# Usage:
+#   ai-stop
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+cd "$SCRIPT_DIR" && poetry run python -m tools.gemini.fast_ask --stop

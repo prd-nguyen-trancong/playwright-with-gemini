@@ -1,0 +1,119 @@
+---
+description: Retest tools after refactoring or code changes
+globs:
+  - tools/**/*.py
+  - bin/*
+alwaysApply: true
+---
+
+# Retest Tools After Changes
+
+When refactoring or updating code in `tools/` or `bin/`, follow this checklist to verify everything works.
+
+## Project Structure
+
+```
+tools/
+  __init__.py
+  gemini/                    # Core Gemini automation tools
+    __init__.py
+    base.py                  # GeminiBase class (shared browser logic)
+    browser.py               # BrowserDaemon (persistent Chrome daemon)
+    daemon_start.py          # Background daemon process
+    fast_ask.py              # Speed-optimized text chat (ai-ask)
+    fast_gem.py              # Speed-optimized Gem chat (ai-gem)
+    ask.py                   # Standard text chat (login, fallback)
+    image.py                 # Image generation (ai-image)
+    veo.py                   # Video generation (ai-veo)
+  story/                     # Story scraping & summarization
+    __init__.py
+    scraper.py               # Chapter scraper (truyenfull.vision)
+    summary.py               # Orchestrator: scrape -> gem service -> save
+```
+
+## Quick Verification Steps
+
+### 1. Import Check (run first - catches broken imports)
+
+```bash
+poetry run python -c "
+from tools.gemini.base import GeminiBase
+from tools.gemini.browser import BrowserDaemon
+from tools.gemini.fast_ask import GeminiFastAsk
+from tools.gemini.fast_gem import GeminiFastGem
+from tools.gemini.ask import GeminiAsk
+from tools.gemini.image import GeminiImage
+from tools.gemini.veo import GeminiVeo
+from tools.story.scraper import StoryScraper
+from tools.story.summary import StorySummary
+print('All imports OK')
+"
+```
+
+### 2. CLI Help Check (verifies argparse and module paths)
+
+```bash
+poetry run python -m tools.gemini.fast_ask --help
+poetry run python -m tools.gemini.fast_gem --help
+poetry run python -m tools.story.summary --help
+```
+
+### 3. Daemon Lifecycle
+
+```bash
+# Start daemon (via any fast tool)
+poetry run python -m tools.gemini.fast_ask --status
+
+# Stop daemon
+poetry run python -m tools.gemini.fast_ask --stop
+```
+
+### 4. Functional Tests
+
+```bash
+# Text chat (fast mode)
+ai-ask-debug "hello, just testing"
+
+# Gem chat
+ai-gem-debug dcca1e614968 "hello, just testing"
+
+# Story summary (single chapter)
+story-get-summary "https://truyenfull.vision/pham-nhan-tu-tien-chi-tien-gioi-thien-pham-nhan-tu-tien-2/chuong-1201/"
+
+# Story summary (batch)
+story-get-summary --from 1201 --to 1203 \
+  "https://truyenfull.vision/pham-nhan-tu-tien-chi-tien-gioi-thien-pham-nhan-tu-tien-2/"
+```
+
+### 5. Shell Script Check
+
+All `bin/` scripts should use `tools.gemini.*` or `tools.story.*` module paths:
+
+| Script | Python Module |
+|--------|---------------|
+| `ai-ask` | `tools.gemini.fast_ask` (or `tools.gemini.ask` with `--slow`) |
+| `ai-ask-debug` | `tools.gemini.fast_ask` (or `tools.gemini.ask` with `--slow`) |
+| `ai-gem` | `tools.gemini.fast_gem` |
+| `ai-gem-debug` | `tools.gemini.fast_gem` |
+| `ai-stop` | `tools.gemini.fast_ask --stop` |
+| `ai-image` | `tools.gemini.image` |
+| `ai-image-debug` | `tools.gemini.image` |
+| `ai-veo` | `tools.gemini.veo` |
+| `ai-veo-debug` | `tools.gemini.veo` |
+| `story-get-summary` | `tools.story.summary` |
+
+## Key Import Patterns
+
+When adding new files or updating imports:
+
+- **Within `tools/gemini/`**: Use `from tools.gemini.base import GeminiBase`
+- **Within `tools/story/`**: Use `from tools.gemini.fast_gem import GeminiFastGem`
+- **Cross-package**: `from tools.gemini.browser import BrowserDaemon`
+- **SCRIPT_DIR** (project root): `os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))` (3 levels up from `tools/gemini/`)
+
+## Common Issues
+
+1. **"Could not extract chapter content"**: The scraper tab needs explicit `page.goto()` navigation for each new URL (the daemon reuses tabs).
+2. **"Not logged in"**: Run `ai-ask --login "hello"` first to set up the browser session.
+3. **"Profile already in use"**: Run `ai-stop` to kill the daemon and orphaned Chrome processes.
+4. **Import errors after move**: Check that all `from tools.xxx` imports are updated to `from tools.gemini.xxx` or `from tools.story.xxx`.

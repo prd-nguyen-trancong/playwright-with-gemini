@@ -14,6 +14,16 @@ gemini_*.mp4
 # Output directory (generated images & videos)
 output/
 
+# Story summaries
+output_summary_story/
+
+# Debug files
+debug/
+debug_*.png
+
+# Browser daemon state
+daemon_state.json
+
 # Python
 __pycache__/
 *.py[cod]

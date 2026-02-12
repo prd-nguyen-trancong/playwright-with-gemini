@@ -1,0 +1,39 @@
+#!/bin/bash
+# Send a prompt to a Gemini Gem and print ONLY the response.
+# Uses a dedicated "gem" tab in the browser daemon (separate from ai-ask).
+# Both ai-ask and ai-gem can run in parallel without interference.
+#
+# Usage:
+#   ai-gem <gem_id> "your prompt"
+#   ai-gem dcca1e614968 "tóm tắt chương này"
+#   ai-gem --file story.txt dcca1e614968 "summarize"
+#   ai-gem --new dcca1e614968 "fresh conversation"
+#
+# For step-by-step debug output, use: ai-gem-debug
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [ $# -eq 0 ]; then
+    echo "Usage: ai-gem [OPTIONS] <gem_id> \"your prompt\""
+    echo ""
+    echo "Options:"
+    echo "  --file F         Read prompt from text file"
+    echo "  --new            Force new conversation"
+    echo ""
+    echo "Arguments:"
+    echo "  gem_id           Gem ID (e.g. dcca1e614968)"
+    echo "  prompt           The prompt to send"
+    echo ""
+    echo "Examples:"
+    echo "  ai-gem dcca1e614968 \"tóm tắt chương này\""
+    echo "  ai-gem --file story.txt dcca1e614968 \"summarize\""
+    echo "  ai-gem --new dcca1e614968 \"fresh conversation\""
+    echo ""
+    echo "Debug mode: ai-gem-debug (full step-by-step output)"
+    echo ""
+    echo "Note: ai-gem uses a separate tab from ai-ask."
+    echo "      They can run in parallel without interference."
+    exit 1
+fi
+
+cd "$SCRIPT_DIR" && poetry run python -m tools.gemini.fast_gem --quiet "$@"

@@ -17,7 +17,7 @@ from playwright.sync_api import sync_playwright
 # Unbuffered print
 _print = functools.partial(print, flush=True)
 
-SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 GEMINI_URL = "https://gemini.google.com/app"
 BROWSER_DATA_DIR = os.path.join(SCRIPT_DIR, ".browser-data", "gemini")
 OUTPUT_DIR = os.path.join(SCRIPT_DIR, "output")
@@ -72,7 +72,7 @@ class GeminiBase:
 
     @staticmethod
     def is_logged_in(page) -> bool:
-        """Check if the user is logged into Gemini."""
+        """Check if the user is logged into Gemini and can chat."""
         try:
             current_url = page.url
             if "accounts.google.com" in current_url:
@@ -80,33 +80,58 @@ class GeminiBase:
             if "gemini.google.com" not in current_url:
                 return False
 
-            sign_in_visible = page.evaluate("""() => {
-                const els = document.querySelectorAll('a, button');
-                for (const el of els) {
-                    const text = (el.textContent || '').trim();
-                    if (text === 'Sign in' && el.offsetParent !== null) return true;
-                }
+            # Check if the chat editor is available (most reliable indicator)
+            return page.evaluate("""() => {
+                const editor = document.querySelector('.ql-editor[contenteditable="true"]');
+                if (editor) return true;
+
+                // Fallback: check for model-response or chat elements
+                const chatEls = document.querySelectorAll('model-response, message-content');
+                if (chatEls.length > 0) return true;
+
                 return false;
             }""")
-            return not sign_in_visible
         except Exception:
             return False
 
     def _wait_for_manual_login(self, ctx, page):
         """Wait for user to manually log in via the open browser window."""
         self.log("\n  Please log in to your Google account in the browser window.")
-        self.log("  The script will auto-detect when login is complete.\n")
+        self.log("  (Passkey login may close the browser - that's OK, it will re-check.)\n")
 
-        for _ in range(180):
+        for attempt in range(180):
             time.sleep(2)
             try:
+                # Check all pages in the context
+                pages_alive = False
                 for pg in ctx.pages:
+                    try:
+                        url = pg.url
+                        pages_alive = True
+                    except Exception:
+                        continue
+
+                    if "gemini.google.com" not in url:
+                        continue
+
                     if self.is_logged_in(pg):
                         self.log("  Login detected!")
                         time.sleep(3)
                         return pg
-            except Exception:
-                pass
+
+                # If no pages are alive, the browser may have been closed by passkey
+                if not pages_alive:
+                    self.log("  Browser closed (passkey flow). Will re-check session...")
+                    return "BROWSER_CLOSED"
+
+            except Exception as e:
+                err_msg = str(e).lower()
+                if "target closed" in err_msg or "closed" in err_msg or "crash" in err_msg:
+                    self.log("  Browser closed (passkey flow). Will re-check session...")
+                    return "BROWSER_CLOSED"
+
+            if attempt > 0 and attempt % 30 == 0:
+                self.log(f"  Still waiting for login... ({attempt * 2}s)")
 
         self.log("  Timeout waiting for login.")
         return None
@@ -116,6 +141,12 @@ class GeminiBase:
     def _launch_context(self, playwright, headless=True):
         """Launch a persistent browser context."""
         os.makedirs(BROWSER_DATA_DIR, exist_ok=True)
+        # Clean up lock files that may have been left by a crashed browser
+        for name in ("SingletonLock", "SingletonSocket", "SingletonCookie"):
+            try:
+                os.remove(os.path.join(BROWSER_DATA_DIR, name))
+            except FileNotFoundError:
+                pass
         return playwright.chromium.launch_persistent_context(
             BROWSER_DATA_DIR,
             headless=headless,
@@ -126,12 +157,12 @@ class GeminiBase:
 
     def _navigate_to_gemini(self, page):
         """Navigate to Gemini and wait for load."""
-        page.goto(GEMINI_URL, wait_until="domcontentloaded", timeout=60000)
+        page.goto(GEMINI_URL, wait_until="domcontentloaded", timeout=30000)
         try:
-            page.wait_for_load_state("networkidle", timeout=20000)
+            page.wait_for_load_state("networkidle", timeout=10000)
         except PTE:
             pass
-        time.sleep(5)
+        time.sleep(1)
 
     def _ensure_login(self, playwright, page, ctx, headless, force_login):
         """Ensure the user is logged in, opening visible browser if needed."""
@@ -140,25 +171,86 @@ class GeminiBase:
 
         if headless or force_login:
             self.log("\n  Not logged in. Restarting with visible browser...")
-            ctx.close()
+            try:
+                ctx.close()
+            except Exception:
+                pass
 
             ctx = self._launch_context(playwright, headless=False)
             page = ctx.new_page()
             self._navigate_to_gemini(page)
 
         logged_in_page = self._wait_for_manual_login(ctx, page)
-        if not logged_in_page:
+
+        if logged_in_page == "BROWSER_CLOSED":
+            # Passkey login closed the browser - re-launch headless and verify
+            self.log("      Re-launching browser to verify login...")
+            try:
+                ctx.close()
+            except Exception:
+                pass
+            time.sleep(2)
+
+            # Clean up lock files left by crashed browser
+            for name in ("SingletonLock", "SingletonSocket", "SingletonCookie"):
+                lock_path = os.path.join(BROWSER_DATA_DIR, name)
+                try:
+                    os.remove(lock_path)
+                except FileNotFoundError:
+                    pass
+
+            ctx = self._launch_context(playwright, headless=headless)
+            page = ctx.new_page()
+            self._navigate_to_gemini(page)
+
+            if self.is_logged_in(page):
+                self.log("      Login verified after passkey!")
+                self._ctx = ctx
+                self._page = page
+                return page, ctx
+            else:
+                self.log("  Login not detected after passkey. Retrying with visible browser...")
+                try:
+                    ctx.close()
+                except Exception:
+                    pass
+                # Give user one more chance with visible browser
+                ctx = self._launch_context(playwright, headless=False)
+                page = ctx.new_page()
+                self._navigate_to_gemini(page)
+
+                if self.is_logged_in(page):
+                    self.log("      Login verified!")
+                    self._ctx = ctx
+                    self._page = page
+                    return page, ctx
+
+                logged_in_page = self._wait_for_manual_login(ctx, page)
+                if not logged_in_page or logged_in_page == "BROWSER_CLOSED":
+                    self.log("  ERROR: Login failed after passkey retry.")
+                    sys.exit(1)
+                page = logged_in_page
+
+        elif not logged_in_page:
             self.log("  ERROR: Login failed or timed out.")
             sys.exit(1)
-        page = logged_in_page
+        else:
+            page = logged_in_page
 
         self.log("      Navigating to Gemini chat...")
         self._navigate_to_gemini(page)
 
-        if not self.is_logged_in(page):
-            self.log("  ERROR: Still not logged in after login attempt.")
-            page.screenshot(path="debug_gemini_login.png")
-            sys.exit(1)
+        # Retry login check a few times (page may still be loading)
+        for retry in range(5):
+            if self.is_logged_in(page):
+                break
+            self.log(f"      Waiting for login to propagate... ({retry + 1}/5)")
+            time.sleep(3)
+        else:
+            if not self.is_logged_in(page):
+                self.log("  ERROR: Still not logged in after login attempt.")
+                page.screenshot(path="debug_gemini_login.png")
+                sys.exit(1)
 
         self._ctx = ctx
         self._page = page
@@ -200,15 +292,15 @@ class GeminiBase:
         # Click the "Tools" dropdown button
         tools_btn = page.locator('button:has-text("Tools")').first
         try:
-            if tools_btn.is_visible(timeout=5000):
+            if tools_btn.is_visible(timeout=4000):
                 tools_btn.click()
-                time.sleep(2)
+                time.sleep(1)
 
                 # Click the specific tool menu item
                 tool_item = page.locator(f'text={self.TOOL_NAME}').first
                 if tool_item.is_visible(timeout=3000):
                     tool_item.click()
-                    time.sleep(3)
+                    time.sleep(2)
                     self.log(f"      Tool activated: {self.TOOL_NAME}")
                 else:
                     self.log(f"  WARNING: Tool '{self.TOOL_NAME}' not found in menu")
@@ -329,12 +421,24 @@ class GeminiBase:
     @staticmethod
     def _clean_response(text):
         """Strip Gemini UI prefixes from response text."""
+        import re
+
+        # Strip known Gem/tool UI headers (e.g. "T\nTóm tắt truyện V3\nCustom Gem\nGemini said")
+        # Pattern: single char line + Gem name + "Custom Gem" + "Gemini said"
+        text = re.sub(
+            r"^[A-Z]\n.+\nCustom Gem\nGemini said\n+",
+            "",
+            text,
+            count=1,
+        )
+
         prefixes_to_strip = [
             "Show code\n",
             "Analysis\n",
             "Query successful\n",
             "Gemini said\n\n",
             "Gemini said\n",
+            "Custom Gem\n",
         ]
         changed = True
         while changed:
@@ -408,7 +512,7 @@ class GeminiBase:
                 self.log("      Login verified!")
 
                 self._dismiss_dialogs(page)
-                time.sleep(2)
+                time.sleep(1)
 
                 # Activate the tool (if any)
                 self._activate_tool(page)
@@ -454,7 +558,7 @@ class GeminiBase:
                         self.log(f"{'=' * 60}")
 
                 if not headless:
-                    wait = 30
+                    wait = 10
                     self.log(f"\n  Browser open for {wait}s. Ctrl+C to close.\n")
                     try:
                         time.sleep(wait)

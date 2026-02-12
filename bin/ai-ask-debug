@@ -1,12 +1,16 @@
 #!/bin/bash
 # Send a prompt to Gemini with full step-by-step debug output.
+# Uses persistent browser daemon for speed.
+# Falls back to standard mode if daemon fails.
 #
 # Usage:
 #   ai-ask-debug "your prompt"
-#   ai-ask-debug --file image.png "describe this image"
+#   ai-ask-debug --file story.txt "summarize"
 #   ai-ask-debug --login "prompt"
-#   ai-ask-debug --no-headless "prompt"
-#   ai-ask-debug --screenshot result.png "prompt"
+#   ai-ask-debug --new "fresh conversation"
+#   ai-ask-debug --slow "prompt"    # Without browser daemon
+#
+# For Gem debug, use: ai-gem-debug <gem_id> "prompt"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -14,16 +18,32 @@ if [ $# -eq 0 ]; then
     echo "Usage: ai-ask-debug [OPTIONS] \"your prompt\""
     echo ""
     echo "Options:"
-    echo "  --file F         Attach image file to prompt"
-    echo "  --login          Force re-login (opens browser)"
-    echo "  --no-headless    Show the browser window"
-    echo "  --screenshot F   Save page screenshot to file"
+    echo "  --file F         Read prompt from text file"
+    echo "  --new            Force new conversation"
+    echo "  --login          First-time login (opens browser)"
+    echo "  --stop           Kill browser daemon"
+    echo "  --status         Check daemon status"
+    echo "  --slow           Use standard mode (no daemon)"
     echo ""
     echo "Examples:"
     echo "  ai-ask-debug \"What is Python?\""
-    echo "  ai-ask-debug --file photo.png \"describe this image\""
-    echo "  ai-ask-debug --no-headless \"Hello Gemini\""
+    echo "  ai-ask-debug --file story.txt \"summarize\""
+    echo "  ai-ask-debug --slow \"hello\"  # Without daemon"
+    echo ""
+    echo "For Gem debug: ai-gem-debug <gem_id> \"prompt\""
     exit 1
 fi
 
-cd "$SCRIPT_DIR" && poetry run python -m tools.ask "$@"
+# Check for --slow flag: use standard mode (tools.gemini.ask) instead of daemon
+for arg in "$@"; do
+    if [ "$arg" = "--slow" ]; then
+        ARGS=()
+        for a in "$@"; do
+            [ "$a" != "--slow" ] && ARGS+=("$a")
+        done
+        cd "$SCRIPT_DIR" && poetry run python -m tools.gemini.ask "${ARGS[@]}"
+        exit $?
+    fi
+done
+
+cd "$SCRIPT_DIR" && poetry run python -m tools.gemini.fast_ask "$@"

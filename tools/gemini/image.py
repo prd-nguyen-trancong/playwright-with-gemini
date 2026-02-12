@@ -5,9 +5,9 @@ Activates the "Create images" tool from the Tools dropdown before sending
 the prompt, which produces higher quality results than plain text prompts.
 
 Usage:
-    poetry run python -m tools.image "a cute banana cartoon"
-    poetry run python -m tools.image --output output/banana.png "image of a banana"
-    poetry run python -m tools.image --quiet "image of a cat"
+    poetry run python -m tools.gemini.image "a cute banana cartoon"
+    poetry run python -m tools.gemini.image --output output/banana.png "image of a banana"
+    poetry run python -m tools.gemini.image --quiet "image of a cat"
 """
 
 import argparse
@@ -16,7 +16,7 @@ import os
 import sys
 import time
 
-from tools.base import GeminiBase
+from tools.gemini.base import GeminiBase
 
 
 class GeminiImage(GeminiBase):
@@ -192,10 +192,10 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  poetry run python -m tools.image "a cute banana cartoon"
-  poetry run python -m tools.image --output output/banana.png "image of a banana"
-  poetry run python -m tools.image --quiet "image of a cat"
-  poetry run python -m tools.image --login "image of a dog"
+  poetry run python -m tools.gemini.image "a cute banana cartoon"
+  poetry run python -m tools.gemini.image --output output/banana.png "image of a banana"
+  poetry run python -m tools.gemini.image --quiet "image of a cat"
+  poetry run python -m tools.gemini.image --login "image of a dog"
 """,
     )
     parser.add_argument("prompt", help="The image generation prompt")

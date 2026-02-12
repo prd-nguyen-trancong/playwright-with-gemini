@@ -1,0 +1,26 @@
+#!/bin/bash
+# Send a prompt to a Gemini Gem with full step-by-step debug output.
+# Uses a dedicated "gem" tab in the browser daemon (separate from ai-ask).
+#
+# Usage:
+#   ai-gem-debug <gem_id> "your prompt"
+#   ai-gem-debug dcca1e614968 "tóm tắt chương này"
+#   ai-gem-debug --file story.txt dcca1e614968 "summarize"
+#   ai-gem-debug --new dcca1e614968 "fresh conversation"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [ $# -eq 0 ]; then
+    echo "Usage: ai-gem-debug [OPTIONS] <gem_id> \"your prompt\""
+    echo ""
+    echo "Options:"
+    echo "  --file F         Read prompt from text file"
+    echo "  --new            Force new conversation"
+    echo ""
+    echo "Examples:"
+    echo "  ai-gem-debug dcca1e614968 \"tóm tắt chương này\""
+    echo "  ai-gem-debug --file story.txt dcca1e614968 \"summarize\""
+    exit 1
+fi
+
+cd "$SCRIPT_DIR" && poetry run python -m tools.gemini.fast_gem "$@"

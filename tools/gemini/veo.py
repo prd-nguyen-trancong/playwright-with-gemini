@@ -5,9 +5,9 @@ Activates the video creation tool from the Tools dropdown, sends a prompt,
 waits for the video to be generated, and downloads it.
 
 Usage:
-    poetry run python -m tools.veo "a man dancing in the street"
-    poetry run python -m tools.veo --output output/dance.mp4 "a man dancing"
-    poetry run python -m tools.veo --quiet "a cat playing piano"
+    poetry run python -m tools.gemini.veo "a man dancing in the street"
+    poetry run python -m tools.gemini.veo --output output/dance.mp4 "a man dancing"
+    poetry run python -m tools.gemini.veo --quiet "a cat playing piano"
 """
 
 import argparse
@@ -15,7 +15,7 @@ import os
 import sys
 import time
 
-from tools.base import GeminiBase
+from tools.gemini.base import GeminiBase
 
 
 class GeminiVeo(GeminiBase):
@@ -242,10 +242,10 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  poetry run python -m tools.veo "a man dancing in the street"
-  poetry run python -m tools.veo --output output/dance.mp4 "a cat playing piano"
-  poetry run python -m tools.veo --quiet "a sunset timelapse"
-  poetry run python -m tools.veo --login "a bird flying"
+  poetry run python -m tools.gemini.veo "a man dancing in the street"
+  poetry run python -m tools.gemini.veo --output output/dance.mp4 "a cat playing piano"
+  poetry run python -m tools.gemini.veo --quiet "a sunset timelapse"
+  poetry run python -m tools.gemini.veo --login "a bird flying"
 """,
     )
     parser.add_argument("prompt", help="The video generation prompt")
