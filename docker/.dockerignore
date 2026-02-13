@@ -1,0 +1,13 @@
+# Ignore unnecessary files in Docker build context
+.browser-data/
+output/
+output_summary_story/
+raw_content_story/
+debug/
+.git/
+.cursor/
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+go-dev-tools/bin/

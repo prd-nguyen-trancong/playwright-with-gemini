@@ -1,206 +1,282 @@
 # Gemini AI Automation
 
-Interact with Google Gemini AI (text chat, image generation, video generation, story summarization) using Python Playwright with persistent browser authentication.
+Interact with Google Gemini AI (text chat, image generation, video generation, story summarization) using browser automation with persistent authentication.
 
-## Available Tools
-
-| Command | Description |
-|---------|-------------|
-| `ai-ask` | Text chat (fast daemon mode, ~4-5s per call) |
-| `ai-gem <id>` | Chat using a specific Gem (separate tab from ai-ask) |
-| `ai-image` | Image generation via "Create images" tool |
-| `ai-veo` | Video generation via "Create videos (Veo 3.1)" tool |
-| `story-get-summary` | Scrape story chapter + summarize via Gem |
-| `ai-stop` | Kill browser daemon to free memory |
+Available in **two implementations**:
+- **Python** (Playwright) - Original, full-featured
+- **Go** (Rod) - High-performance rewrite, faster startup and lower memory
 
 ## Quick Start
+
+### Go (Recommended - High Performance)
+
+```bash
+# 1. Build Go binaries
+cd go-dev-tools && make build && cd ..
+
+# 2. First-time login (opens visible Chrome for Google login)
+go-ai-ask --login "hello"
+
+# 3. Text chat
+go-ai-ask "What is Python?"
+go-ai-ask --quiet "What is 2+2?"
+
+# 4. Translate (Japanese/Chinese → Vietnamese)
+go-ai-translate "こんにちは世界"
+go-ai-translate --file document.txt
+
+# 5. Correct English grammar
+go-ai-english "I has go to school yesterday"
+
+# 6. Story summarization
+go-ai-story-summary "https://truyenfull.vision/.../chuong-1201/"
+
+# 7. Stop daemon
+go-ai-stop
+```
+
+### Python
 
 ```bash
 # 1. Install dependencies
 poetry install
+poetry run playwright install chromium
 
-# 2. First-time Gemini login (opens browser for Google login)
-ai-ask --login "hello"
+# 2. First-time login (opens browser for Google login)
+poetry run python -m tools.gemini.fast_ask --login "hello"
 
-# 3. Use Gemini tools
-ai-ask "What is Python?"
-ai-gem dcca1e614968 "tóm tắt chương này"
-ai-image "a cute banana cartoon"
-ai-veo "a man dancing in the street"
-story-get-summary "https://truyenfull.vision/.../chuong-1090/"
-```
+# 3. Text chat
+poetry run python -m tools.gemini.fast_ask "What is Python?"
+poetry run python -m tools.gemini.fast_ask --quiet "What is 2+2?"
 
-## Global Commands Setup
+# 4. Gem chat (separate tab)
+poetry run python -m tools.gemini.fast_gem dcca1e614968 "summarize this"
 
-```bash
-# Option 1: Run setup script (creates symlinks in /usr/local/bin)
-sudo ./bin/setup-commands.sh
+# 5. Story summarization
+poetry run python -m tools.story.summary "https://truyenfull.vision/.../chuong-1201/"
 
-# Option 2: Add to PATH (add to ~/.zshrc or ~/.bashrc)
-export PATH="$PATH:/path/to/this-project/bin"
+# 6. Stop daemon
+poetry run python -m tools.gemini.fast_ask --stop
 ```
 
 ---
 
-## ai-ask (Fast Text Chat)
+## Shell Aliases (Run from Anywhere)
 
-Uses a **persistent browser daemon** for speed. First call ~10-15s, subsequent ~4-5s.
-Reuses conversation for up to 20 prompts, then starts fresh.
-Uses a dedicated "ask" tab - never interferes with `ai-gem`.
+Add to `~/.zshrc` and `~/.bash_profile`:
 
 ```bash
-ai-ask "What is Python?"
-ai-ask "translate to english: chào buổi sáng"
-ai-ask --file story.txt "summarize this"          # Read prompt from file
-ai-ask --new "start fresh conversation"           # Force new conversation
-ai-ask --login "hello"                            # First-time login
-ai-ask --stop                                     # Kill browser daemon
-ai-ask --status                                   # Check daemon status
-ai-ask-debug "What is Python?"                    # Step-by-step output
+# Gemini AI Tools (Go)
+export PROJECT_ROOT="/Users/n.tran/paradox/source/olivia-some-auto-playwright"
+export PATH="$PATH:$PROJECT_ROOT/go-dev-tools/bin"
+
+# Gemini AI Tool Aliases
+alias go-ai-translate='go-ai-gem --quiet 3f9e2319b62e'       # Translate → Vietnamese
+alias go-ai-english='go-ai-gem --quiet ad4d96a4c35e'         # Correct English grammar
+alias go-ai-story-summary='go-story-summary --gem dcca1e614968'  # Story summary
 ```
 
-## ai-gem (Fast Gem Chat)
+### Available Commands
 
-Uses a **dedicated "gem" tab** in the daemon - completely separate from `ai-ask`.
-Both can run in parallel without interference.
+| Command | Description |
+|---|---|
+| `go-ai-ask "prompt"` | Text chat with Gemini |
+| `go-ai-gem <gem_id> "prompt"` | Chat with a specific Gem |
+| `go-ai-translate "text"` | Translate to Vietnamese (Gem `3f9e2319b62e`) |
+| `go-ai-translate --file doc.txt` | Translate file content |
+| `go-ai-english "text"` | Correct English grammar (Gem `ad4d96a4c35e`) |
+| `go-ai-story-summary "url"` | Summarize story chapter (Gem `dcca1e614968`) |
+| `go-ai-stop` | Stop browser daemon |
+
+### Common Flags
+
+All commands support these flags in **any position**:
 
 ```bash
-ai-gem dcca1e614968 "tóm tắt chương này"
-ai-gem --file story.txt dcca1e614968 "summarize"  # Read prompt from file
-ai-gem --new dcca1e614968 "fresh conversation"    # Force new conversation
-ai-gem-debug dcca1e614968 "tóm tắt"              # Step-by-step output
+--quiet       # Only print response (no debug output)
+--file path   # Read content from file
+--new         # Force new conversation
+--login       # Force re-login (go-ai-ask only)
+--stop        # Stop daemon (go-ai-ask only)
+--status      # Show daemon status (go-ai-ask only)
 ```
 
-### Browser Daemon
-
-`ai-ask` and `ai-gem` share the same Chrome daemon but use **separate tabs**:
-- **First call**: launches Chrome (~10-15s), navigates to Gemini, sends prompt
-- **Subsequent calls**: connects to running Chrome (~4-5s), sends prompt directly
-- **After 20 prompts**: automatically starts a new conversation
-- **ai-ask** uses the "ask" tab, **ai-gem** uses the "gem" tab
-- **Kill daemon**: `ai-ask --stop` or `ai-stop`
-
-## ai-image (Image Generation)
-
-Uses Gemini's **Create images** tool. Output defaults to `output/image_<id>.png`.
+### Examples
 
 ```bash
-ai-image "a cute banana cartoon"
-ai-image --output output/banana.png "image of a banana"
-ai-image-debug "a cute banana cartoon"
+# Translate a Japanese file
+go-ai-translate --file japanese.txt
+
+# Correct English with file input
+go-ai-english --file draft.txt "fix grammar and improve clarity"
+
+# Ask with file context
+go-ai-ask --quiet --file code.py "explain this code"
+
+# Gem with flags in any order
+go-ai-gem 3f9e2319b62e --quiet --file content.txt "translate this"
+
+# Story batch: chapters 1201 to 1211
+go-ai-story-summary --from 1201 --to 1211 \
+  "https://truyenfull.vision/pham-nhan-tu-tien-chi-tien-gioi-thien-pham-nhan-tu-tien-2/"
 ```
 
-## ai-veo (Video Generation)
+---
 
-Uses Gemini's **Create videos (Veo 3.1)** tool. Output defaults to `output/veo_<id>.mp4`.
+## Go Tools - Detailed Usage
+
+### Text Chat (go-ai-ask)
 
 ```bash
-ai-veo "a man dancing in the street"
-ai-veo --output output/dance.mp4 "a cat playing piano"
-ai-veo-debug "a man dancing in the street"
+go-ai-ask "What is Python?"
+go-ai-ask --quiet "What is 2+2?"
+go-ai-ask --file story.txt "summarize this"
+go-ai-ask --new "start fresh conversation"
+go-ai-ask --login "hello"
+go-ai-ask --stop
+go-ai-ask --status
 ```
 
-## story-get-summary (Story Summarization)
-
-Scrapes a story chapter from truyenfull.vision and summarizes it using a Gemini Gem.
+### Gem Chat (go-ai-gem)
 
 ```bash
-# Summarize a chapter (uses default Gem: "Tóm tắt truyện V3")
-story-get-summary "https://truyenfull.vision/pham-nhan-tu-tien-.../chuong-1090/"
-
-# Use a specific Gem
-story-get-summary --gem dcca1e614968 "https://truyenfull.vision/.../chuong-1205/"
-
-# Quiet mode (only print summary)
-story-get-summary --quiet "https://truyenfull.vision/.../chuong-1090/"
+go-ai-gem dcca1e614968 "summarize this chapter"
+go-ai-gem --quiet dcca1e614968 "summarize"
+go-ai-gem --file story.txt dcca1e614968 "summarize"
+go-ai-gem --new dcca1e614968 "fresh conversation"
 ```
 
-**Workflow:**
-1. Scrapes chapter content from the URL
-2. Saves raw text to `raw_content_story/<chapter_title>.txt`
-3. Sends content to the Gem for summarization
-4. Saves summary to `output_summary_story/<chapter_title>.txt`
-5. Limits to 10 requests per Gem session (restarts for accuracy)
+### Story Summarization (go-story-summary)
+
+```bash
+# Single chapter
+go-story-summary "https://truyenfull.vision/.../chuong-1201/"
+
+# Batch: chapters 1201 to 1211
+go-story-summary --from 1201 --to 1211 \
+  "https://truyenfull.vision/pham-nhan-tu-tien-chi-tien-gioi-thien-pham-nhan-tu-tien-2/"
+
+# Custom Gem
+go-story-summary --gem dcca1e614968 --from 1201 --to 1211 \
+  "https://truyenfull.vision/pham-nhan-tu-tien-chi-tien-gioi-thien-pham-nhan-tu-tien-2/"
+```
+
+### Building Go Tools
+
+```bash
+cd go-dev-tools
+
+make build              # Build for current platform
+make build-linux        # Build for Linux (Docker)
+make build-darwin-arm   # Build for macOS Apple Silicon
+make install            # Install to /usr/local/bin
+make clean              # Clean build artifacts
+make help               # Show all targets
+```
+
+---
+
+## Python Tools - Detailed Usage
+
+### Text Chat (fast_ask)
+
+```bash
+poetry run python -m tools.gemini.fast_ask "What is Python?"
+poetry run python -m tools.gemini.fast_ask --quiet "What is 2+2?"
+poetry run python -m tools.gemini.fast_ask --file story.txt "summarize this"
+poetry run python -m tools.gemini.fast_ask --new "start fresh"
+poetry run python -m tools.gemini.fast_ask --login "hello"
+poetry run python -m tools.gemini.fast_ask --stop
+poetry run python -m tools.gemini.fast_ask --status
+```
+
+### Gem Chat (fast_gem)
+
+```bash
+poetry run python -m tools.gemini.fast_gem dcca1e614968 "summarize this chapter"
+poetry run python -m tools.gemini.fast_gem --quiet dcca1e614968 "summarize"
+poetry run python -m tools.gemini.fast_gem --file story.txt dcca1e614968 "summarize"
+poetry run python -m tools.gemini.fast_gem --new dcca1e614968 "fresh conversation"
+```
+
+### Image Generation (image)
+
+```bash
+poetry run python -m tools.gemini.image "a cute banana cartoon"
+poetry run python -m tools.gemini.image --output output/banana.png "banana"
+```
+
+### Video Generation (veo)
+
+```bash
+poetry run python -m tools.gemini.veo "a man dancing in the street"
+poetry run python -m tools.gemini.veo --output output/dance.mp4 "cat playing piano"
+```
+
+### Story Summarization (story.summary)
+
+```bash
+poetry run python -m tools.story.summary "https://truyenfull.vision/.../chuong-1201/"
+poetry run python -m tools.story.summary --from 1201 --to 1211 \
+  "https://truyenfull.vision/pham-nhan-tu-tien-chi-tien-gioi-thien-pham-nhan-tu-tien-2/"
+```
 
 ---
 
 ## Architecture
 
-```
-tools/
-├── __init__.py
-├── base.py              # GeminiBase - shared browser, login, prompt logic
-├── browser.py           # BrowserDaemon - Chrome daemon via CDP (role-based tabs)
-├── fast_ask.py          # GeminiFastAsk - speed-optimized text chat ("ask" tab)
-├── fast_gem.py          # GeminiFastGem - speed-optimized Gem chat ("gem" tab)
-├── ask.py               # GeminiAsk - standard text chat (login flow)
-├── image.py             # GeminiImage - "Create images" tool
-├── veo.py               # GeminiVeo - "Create videos (Veo 3.1)" tool
-└── story_summary.py     # GeminiStorySummary - scrape + Gem summary ("story" tab)
+### Browser Profiles (Separate)
+
+Python and Go use **separate browser profiles** to avoid conflicts:
+
+| | Profile Directory | CDP Port |
+|---|---|---|
+| **Python** (Playwright) | `.browser-data/gemini/` | 9222 |
+| **Go** (Rod) | `.browser-data/gemini-go/` | 9223 |
+
+Login separately for each tool:
+```bash
+poetry run python -m tools.gemini.fast_ask --login "hello"   # Python
+go-ai-ask --login "hello"                                     # Go
 ```
 
 ### Speed Architecture (BrowserDaemon)
 
-Each tool gets its own dedicated tab, so they never cross-contaminate:
+Chrome runs as a persistent headless daemon (`--headless=new`). Each tool gets its own dedicated tab:
 
 ```
-┌─────────────┐     CDP (port 9222)     ┌──────────────────────────────┐
-│   ai-ask    │ ──── connect ────────── │  Tab 1: "ask" (gemini.com)  │
-└─────────────┘                         │                              │
-┌─────────────┐     CDP (port 9222)     │  Tab 2: "gem" (gem/xxx)     │
-│   ai-gem    │ ──── connect ────────── │                              │
-└─────────────┘                         │  Tab 3: "story" (gem/xxx)   │
-┌─────────────┐     CDP (port 9222)     │                              │
-│ story-get-  │ ──── connect ────────── │  Chrome Daemon (stays alive) │
-│  summary    │                         │  Profile: .browser-data/     │
-└─────────────┘                         └──────────────────────────────┘
+Python (port 9222)                    Go (port 9223)
+┌─────────────┐                       ┌─────────────┐
+│  fast_ask    │ ── Tab 1: "ask"      │  go-ai-ask  │ ── Tab 1: "ask"
+│  fast_gem    │ ── Tab 2: "gem"      │  go-ai-gem  │ ── Tab 2: "gem"
+│  story       │ ── Tab 3: "story"    │  go-story   │ ── Tab 3: "story"
+└─────────────┘                       └─────────────┘
 ```
 
-### Python API
+### Gem IDs
 
-```python
-from tools.fast_ask import GeminiFastAsk
-from tools.fast_gem import GeminiFastGem
-from tools.image import GeminiImage
-from tools.veo import GeminiVeo
-from tools.story_summary import GeminiStorySummary
-
-# Fast text chat (daemon mode - "ask" tab)
-ask = GeminiFastAsk(quiet=True)
-response = ask.run_fast(prompt="What is Python?")
-
-# Fast Gem chat (daemon mode - "gem" tab, separate from ask)
-gem = GeminiFastGem(quiet=True)
-response = gem.run_fast(prompt="Summarize", gem_id="dcca1e614968")
-
-# Image generation
-img = GeminiImage(quiet=True)
-path = img.run(prompt="a cute banana", output_path="output/banana.png")
-
-# Video generation
-veo = GeminiVeo(quiet=True)
-path = veo.run(prompt="a man dancing", output_path="output/dance.mp4")
-
-# Story summarization (uses its own "story" tab)
-story = GeminiStorySummary(quiet=True, gem_id="dcca1e614968")
-summary = story.run_summary(url="https://truyenfull.vision/.../chuong-1090/")
-```
+| Gem | ID | Alias |
+|---|---|---|
+| Translate to Vietnamese | `3f9e2319b62e` | `go-ai-translate` |
+| Correct English Grammar | `ad4d96a4c35e` | `go-ai-english` |
+| Story Summary (Tóm tắt truyện V3) | `dcca1e614968` | `go-ai-story-summary` |
 
 ---
 
 ## Gemini Login
 
-Gemini uses a **persistent browser profile** - no cookies or env vars needed.
-
 ```bash
-# First-time login (stops daemon, opens visible browser)
-ai-ask --login "hello"
+# Python login
+poetry run python -m tools.gemini.fast_ask --login "hello"
+
+# Go login
+go-ai-ask --login "hello"
 ```
 
-1. A Chromium browser window opens
-2. Log in to your Google account
-3. Session saved in `.browser-data/gemini/` and reused
-4. To re-login: `ai-ask --login "hello"` (stops daemon first)
+1. A Chrome browser window opens
+2. Log in to your Google account (passkey may close browser - that's OK)
+3. Session saved and reused automatically
+4. Login once per tool (Python and Go have separate sessions)
 
 ---
 
@@ -208,27 +284,31 @@ ai-ask --login "hello"
 
 ### Not logged in
 ```bash
-ai-ask --login "hello"   # Opens browser for manual Google login
-```
-
-### Session expired
-```bash
-ai-ask --login "hello"   # Stops daemon, re-opens login browser
+poetry run python -m tools.gemini.fast_ask --login "hello"   # Python
+go-ai-ask --login "hello"                                     # Go
 ```
 
 ### Browser daemon issues
 ```bash
-ai-ask --status          # Check if daemon is running
-ai-ask --stop            # Kill daemon
-ai-stop                  # Same as above
+# Python
+poetry run python -m tools.gemini.fast_ask --status
+poetry run python -m tools.gemini.fast_ask --stop
+
+# Go
+go-ai-ask --status
+go-ai-stop
 ```
 
-### Rate limited
-Wait until the specified time, then try again.
-
-### Browser not found
+### Browser not found (Python)
 ```bash
 poetry run playwright install chromium
+```
+
+### Go build issues
+```bash
+cd go-dev-tools
+go mod download
+make build
 ```
 
 ---
@@ -237,32 +317,49 @@ poetry run playwright install chromium
 
 ```
 .
-├── tools/                          # Gemini AI tools (OOP)
-│   ├── base.py                     # GeminiBase class
-│   ├── browser.py                  # BrowserDaemon (CDP manager)
-│   ├── fast_ask.py                 # Fast text chat (daemon)
-│   ├── ask.py                      # Standard text chat (login)
-│   ├── image.py                    # Image generation
-│   ├── veo.py                      # Video generation
-│   └── story_summary.py           # Story scraping + Gem summary
-├── bin/
-│   ├── ai-ask / ai-ask-debug       # Fast text chat (uses "ask" tab)
-│   ├── ai-gem / ai-gem-debug       # Fast Gem chat (uses "gem" tab)
-│   ├── ai-image / ai-image-debug   # Image generation
-│   ├── ai-veo / ai-veo-debug       # Video generation
-│   ├── story-get-summary           # Story summarization
-│   ├── ai-stop                     # Kill browser daemon
-│   └── setup-commands.sh           # Setup global commands
+├── tools/                          # Python tools (Playwright)
+│   ├── gemini/                     # Core Gemini automation
+│   │   ├── base.py                 # GeminiBase class
+│   │   ├── browser.py              # BrowserDaemon (CDP manager)
+│   │   ├── fast_ask.py             # Fast text chat (daemon)
+│   │   ├── fast_gem.py             # Fast Gem chat (daemon)
+│   │   ├── image.py                # Image generation
+│   │   └── veo.py                  # Video generation
+│   └── story/                      # Story tools
+│       ├── scraper.py              # Chapter scraper
+│       └── summary.py              # Scrape + Gem summary
+├── go-dev-tools/                   # Go tools (Rod)
+│   ├── cmd/                        # CLI entry points
+│   │   ├── go-ai-ask/main.go
+│   │   ├── go-ai-gem/main.go
+│   │   ├── go-ai-stop/main.go
+│   │   └── go-story-summary/main.go
+│   ├── internal/                   # Internal packages
+│   │   ├── browser/                # Chrome daemon (Rod + CDP)
+│   │   ├── gemini/                 # Gemini automation
+│   │   └── story/                  # Story scraper + summary
+│   ├── bin/                        # Compiled Go binaries (gitignored)
+│   ├── go.mod
+│   └── Makefile
+├── docker/                         # Docker/Podman setup
+│   ├── Dockerfile
+│   ├── docker-compose.yml
+│   └── podman-setup.sh
+├── .browser-data/                  # Persistent browser profiles (gitignored)
+│   ├── gemini/                     # Python profile (port 9222)
+│   └── gemini-go/                  # Go profile (port 9223)
 ├── output/                         # Generated images & videos
-├── raw_content_story/              # Scraped story chapters
 ├── output_summary_story/           # Story summaries
-├── .browser-data/                  # Persistent browser profiles
-├── pyproject.toml                  # Poetry config
+├── pyproject.toml                  # Poetry config (Python)
 └── README.md
 ```
 
 ## Dependencies
 
+### Python
 - Python 3.11+
 - [Playwright](https://playwright.dev/python/)
-- [python-dotenv](https://github.com/theskumar/python-dotenv)
+
+### Go
+- Go 1.22+
+- [Rod](https://go-rod.github.io/) (browser automation via CDP)

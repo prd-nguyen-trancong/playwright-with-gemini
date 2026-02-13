@@ -32,27 +32,77 @@ def _clean_locks():
             pass
 
 
+def _find_chrome():
+    """Find system Chrome binary."""
+    candidates = [
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "/usr/bin/google-chrome",
+        "/usr/bin/google-chrome-stable",
+        "/usr/bin/chromium-browser",
+        "/usr/bin/chromium",
+    ]
+    for c in candidates:
+        if os.path.isfile(c):
+            return c
+    return None
+
+
 def main():
-    from playwright.sync_api import sync_playwright
+    import subprocess as sp
 
     os.makedirs(BROWSER_DATA_DIR, exist_ok=True)
     _clean_locks()
 
+    chrome_bin = os.environ.get("CHROME_PATH") or _find_chrome()
+    if not chrome_bin:
+        print("ERROR: Chrome not found. Set CHROME_PATH or install Google Chrome.")
+        sys.exit(1)
+
+    # Launch Chrome directly (no Playwright launcher = no --enable-automation flag).
+    # This avoids Gemini's bot detection which blocks send when automation is detected.
+    chrome_args = [
+        chrome_bin,
+        "--headless=new",  # Chrome 112+ new headless mode
+        f"--user-data-dir={BROWSER_DATA_DIR}",
+        f"--remote-debugging-port={CDP_PORT}",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-blink-features=AutomationControlled",
+        "--disable-background-timer-throttling",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-renderer-backgrounding",
+        "--window-size=1440,900",
+    ]
+
+    if os.environ.get("CHROME_NO_SANDBOX") == "true":
+        chrome_args.append("--no-sandbox")
+
+    proc = sp.Popen(chrome_args, stdout=sp.DEVNULL, stderr=sp.DEVNULL)
+
+    # Wait for CDP port
+    import socket
+
+    for _ in range(60):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(0.5)
+                s.connect(("localhost", CDP_PORT))
+                break
+        except (socket.error, ConnectionRefusedError, OSError):
+            time.sleep(0.5)
+    else:
+        print("ERROR: Chrome failed to start on CDP port")
+        proc.kill()
+        sys.exit(1)
+
+    # Connect via Playwright CDP and navigate to Gemini
+    from playwright.sync_api import sync_playwright
+
     pw = sync_playwright().start()
-
-    ctx = pw.chromium.launch_persistent_context(
-        BROWSER_DATA_DIR,
-        headless=True,
-        channel="chrome",
-        viewport={"width": 1440, "height": 900},
-        args=[
-            "--disable-blink-features=AutomationControlled",
-            f"--remote-debugging-port={CDP_PORT}",
-        ],
-    )
-
-    # Navigate to Gemini so the page is ready
+    browser = pw.chromium.connect_over_cdp(f"http://localhost:{CDP_PORT}")
+    ctx = browser.contexts[0] if browser.contexts else browser.new_context()
     page = ctx.pages[0] if ctx.pages else ctx.new_page()
+
     try:
         page.goto(GEMINI_URL, wait_until="domcontentloaded", timeout=60000)
         page.wait_for_load_state("networkidle", timeout=15000)
@@ -63,13 +113,18 @@ def main():
     # Handle SIGTERM gracefully
     def shutdown(signum, frame):
         try:
-            ctx.close()
+            browser.close()
         except Exception:
             pass
         try:
             pw.stop()
         except Exception:
             pass
+        try:
+            proc.terminate()
+            proc.wait(timeout=5)
+        except Exception:
+            proc.kill()
         _clean_locks()
         sys.exit(0)
 

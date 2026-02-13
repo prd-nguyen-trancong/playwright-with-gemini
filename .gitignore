@@ -33,6 +33,13 @@ __pycache__/
 dist/
 build/
 
+# Go build artifacts
+go-dev-tools/bin/
+
+# Benchmark temp files
+benchmark_results.txt
+benchmark.sh
+
 # Virtual environments
 .venv/
 venv/

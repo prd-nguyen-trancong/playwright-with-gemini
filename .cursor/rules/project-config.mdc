@@ -1,0 +1,30 @@
+---
+description: Project configuration and developer identity
+globs:
+alwaysApply: true
+---
+
+# Project Configuration
+
+## Developer Identity
+- **GitHub Username**: `prd-nguyen-trancong`
+- **Go Module Path**: `github.com/prd-nguyen-trancong/gemini-tools`
+- When creating Go imports, always use `github.com/prd-nguyen-trancong/gemini-tools/...`
+- When pushing code to git, use the developer's own git config (do NOT modify git user.name or user.email)
+
+## Browser Data Separation
+- **Python/Playwright** browser profile: `.browser-data/gemini/` (CDP port **9222**)
+- **Go/Rod** browser profile: `.browser-data/gemini-go/` (CDP port **9223**)
+- These are completely separate sessions. Login must be done independently for each.
+- Python and Go daemons can run in parallel without conflict.
+
+## Go Tools
+- Go module is at `go-dev-tools/`
+- Build: `cd go-dev-tools && make build`
+- Binaries output to `go-dev-tools/bin/`
+- Shell wrappers in `bin/go-ai-*` set `PROJECT_ROOT` env var
+
+## Python Tools
+- Python tools are at `tools/gemini/` and `tools/story/`
+- Run via `poetry run python -m tools.gemini.fast_ask ...`
+- Shell wrappers in `bin/ai-*`

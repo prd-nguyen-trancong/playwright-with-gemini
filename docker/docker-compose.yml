@@ -1,0 +1,80 @@
+# ============================================================
+# Docker Compose for Gemini Go Tools
+# ============================================================
+# Compatible with both Docker and Podman (podman-compose)
+#
+# Usage with Podman:
+#   podman-compose build
+#   podman-compose run --rm gemini-ask "What is Python?"
+#   podman-compose run --rm gemini-gem dcca1e614968 "tóm tắt"
+#   podman-compose run --rm gemini-story --from 1201 --to 1211 "https://..."
+#
+# Usage with Docker:
+#   docker compose build
+#   docker compose run --rm gemini-ask "What is Python?"
+# ============================================================
+
+services:
+  # ── Base service (shared config) ──────────────────────────
+  gemini-base:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    volumes:
+      # Persist browser session data between runs
+      - browser-data:/home/gemini/app/.browser-data
+      # Persist output files
+      - ../output:/home/gemini/app/output
+      - ../output_summary_story:/home/gemini/app/output_summary_story
+    environment:
+      - PROJECT_ROOT=/home/gemini/app
+      - CHROME_NO_SANDBOX=true
+    # Required for Chrome to work in container
+    shm_size: "2gb"
+    security_opt:
+      - seccomp=unconfined
+    profiles:
+      - never  # Don't start this directly
+
+  # ── ai-ask: Fast Gemini text chat ─────────────────────────
+  gemini-ask:
+    extends:
+      service: gemini-base
+    entrypoint: ["dumb-init", "--", "go-ai-ask"]
+    profiles: []
+
+  # ── ai-ask with login (needs display for Google login) ────
+  gemini-login:
+    extends:
+      service: gemini-base
+    entrypoint: ["dumb-init", "--", "go-ai-ask", "--login"]
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:ro
+    profiles: []
+
+  # ── ai-gem: Fast Gemini Gem chat ──────────────────────────
+  gemini-gem:
+    extends:
+      service: gemini-base
+    entrypoint: ["dumb-init", "--", "go-ai-gem"]
+    profiles: []
+
+  # ── ai-stop: Stop browser daemon ──────────────────────────
+  gemini-stop:
+    extends:
+      service: gemini-base
+    entrypoint: ["dumb-init", "--", "go-ai-stop"]
+    profiles: []
+
+  # ── story-summary: Scrape + summarize ─────────────────────
+  gemini-story:
+    extends:
+      service: gemini-base
+    entrypoint: ["dumb-init", "--", "go-story-summary"]
+    profiles: []
+
+volumes:
+  browser-data:
+    driver: local
